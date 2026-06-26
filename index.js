@@ -534,6 +534,54 @@ app.delete('/expenses/:id', async (req, res) => {
   }
 });
 
+// ১. আজকের টোটাল এবং ডেটা ফিল্টার এপিআই
+app.get('/expenses/today', async (req, res) => {
+  try {
+    const db = dbConnection || (await client.connect(), client.db('icc_clients'));
+    
+    // আজকের দিনের শুরু এবং শেষ টাইমস্ট্যাম্প (BD Time Zone UTC+6 অনুযায়ী সেট করা ভালো)
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const query = {
+      expenseDate: { $gte: startOfToday, $lte: endOfToday }
+    };
+
+    const data = await db.collection('expenses').find(query).sort({ expenseDate: -1 }).toArray();
+    
+    // মোট খরচ হিসাব
+    const totalAmount = data.reduce((sum, item) => sum + (item.amount || 0), 0);
+
+    res.send({ success: true, totalAmount, count: data.length, data });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+});
+
+// ২. এই চলতি মাসের টোটাল এবং ডেটা ফিল্টার এপিআই
+app.get('/expenses/this-month', async (req, res) => {
+  try {
+    const db = dbConnection || (await client.connect(), client.db('icc_clients'));
+    
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const query = {
+      expenseDate: { $gte: startOfMonth, $lte: endOfMonth }
+    };
+
+    const data = await db.collection('expenses').find(query).sort({ expenseDate: -1 }).toArray();
+    const totalAmount = data.reduce((sum, item) => sum + (item.amount || 0), 0);
+
+    res.send({ success: true, totalAmount, count: data.length, data });
+  } catch (error) {
+    res.status(500).send({ success: false, message: error.message });
+  }
+});
+
 app.get('/expenses-total', async (req, res) => {
   try {
     const db = dbConnection || (await client.connect(), client.db('icc_clients'));
